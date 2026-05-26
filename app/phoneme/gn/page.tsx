@@ -47,7 +47,44 @@ export default function GNPage() {
       chunksRef.current.push(e.data);
     };
 
-    recorder.onstop = async () => {
+ recorder.onstop = async () => {
+  const blob = new Blob(chunksRef.current, {
+    type: "audio/webm",
+  });
+
+  const formData = new FormData();
+  formData.append("file", blob, "audio.webm");
+
+  const res = await fetch("/api/transcribe", {
+    method: "POST",
+    body: formData,
+  });
+
+  const data = await res.json();
+
+  const transcript = data.text?.toLowerCase() || "";
+  const target = current.text.toLowerCase();
+
+  let similarity = 0;
+
+  if (transcript.includes(target)) {
+    similarity = 95;
+  } else if (transcript.length > 0) {
+    similarity = 60;
+  } else {
+    similarity = 30;
+  }
+
+  setScore(similarity);
+
+  setFeedback(
+    similarity > 80
+      ? "🟢 Très bonne prononciation !"
+      : "🔴 J’ai entendu: " + transcript
+  );
+
+  stream.getTracks().forEach((t) => t.stop());
+};
       const blob = new Blob(chunksRef.current, {
         type: "audio/webm",
       });
