@@ -23,18 +23,19 @@ export default function GNPage() {
   const [score, setScore] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
 
+  const [mode, setMode] = useState<"learn" | "quiz">("learn");
+  const [answer, setAnswer] = useState<string | null>(null);
+
   const chunksRef = useRef<Blob[]>([]);
 
   const current = words[index];
 
-  // 🎧 play pronunciation
   const playModel = () => {
     const utterance = new SpeechSynthesisUtterance(current.text);
     utterance.lang = "fr-FR";
     speechSynthesis.speak(utterance);
   };
 
-  // 🎤 record audio
   const startRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
@@ -55,7 +56,6 @@ export default function GNPage() {
       const url = URL.createObjectURL(blob);
       setAudioURL(url);
 
-      // 🎯 fake score (prototype)
       const randomScore = Math.floor(Math.random() * 4) + 7;
 
       setScore(randomScore);
@@ -76,57 +76,102 @@ export default function GNPage() {
     }, 3000);
   };
 
+  const currentQuiz = words[index];
+
   return (
     <main style={{ padding: 40 }}>
       <h1>🇫🇷 Son /ɲ/</h1>
 
       <p>Cliquez pour écouter puis enregistrer.</p>
 
-      <h2>{current.text}</h2>
+      {/* MODE SWITCH */}
+      <button
+        onClick={() => {
+          setMode(mode === "learn" ? "quiz" : "learn");
+          setAnswer(null);
+        }}
+        style={{ marginBottom: 20 }}
+      >
+        {mode === "learn" ? "🎯 Quiz Mode" : "📚 Learn Mode"}
+      </button>
 
-      <img
-        src={current.image}
-        width={250}
-        style={{ marginTop: 10, borderRadius: 10 }}
-        alt={current.text}
-      />
+      {/* LEARN MODE */}
+      {mode === "learn" ? (
+        <>
+          <h2>{current.text}</h2>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-        <button onClick={playModel}>▶ Écouter</button>
+          <img
+            src={current.image}
+            width={250}
+            style={{ marginTop: 10, borderRadius: 10 }}
+            alt={current.text}
+          />
 
-        <button onClick={startRecording}>🎤 Enregistrer</button>
+          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+            <button onClick={playModel}>▶ Écouter</button>
 
-        <button
-          onClick={() => {
-            setIndex((prev) => (prev + 1) % words.length);
-            setAudioURL("");
-            setScore(null);
-            setFeedback("");
-          }}
-        >
-          ➡ Suivant
-        </button>
-      </div>
+            <button onClick={startRecording}>🎤 Enregistrer</button>
 
-      {score !== null && (
-        <div
-          style={{
-            marginTop: 20,
-            padding: 15,
-            borderRadius: 10,
-            backgroundColor: score >= 8 ? "#d1fae5" : "#fee2e2",
-            maxWidth: 300,
-          }}
-        >
-          <h3>Score : {score}/10</h3>
-          <p>{feedback}</p>
-        </div>
-      )}
+            <button
+              onClick={() => {
+                setIndex((prev) => (prev + 1) % words.length);
+                setAudioURL("");
+                setScore(null);
+                setFeedback("");
+              }}
+            >
+              ➡ Suivant
+            </button>
+          </div>
 
-      {audioURL && (
-        <div style={{ marginTop: 20 }}>
-          <audio controls src={audioURL} />
-        </div>
+          {score !== null && (
+            <div
+              style={{
+                marginTop: 20,
+                padding: 15,
+                borderRadius: 10,
+                backgroundColor: score >= 8 ? "#d1fae5" : "#fee2e2",
+                maxWidth: 300,
+              }}
+            >
+              <h3>Score : {score}/10</h3>
+              <p>{feedback}</p>
+            </div>
+          )}
+
+          {audioURL && (
+            <div style={{ marginTop: 20 }}>
+              <audio controls src={audioURL} />
+            </div>
+          )}
+        </>
+      ) : (
+        /* QUIZ MODE */
+        <>
+          <h2>Quel mot contient le son /ɲ/ ?</h2>
+
+          <h3>{currentQuiz.text}</h3>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => setAnswer("yes")}>Oui</button>
+            <button onClick={() => setAnswer("no")}>Non</button>
+          </div>
+
+          {answer && (
+            <p style={{ marginTop: 10 }}>
+              {currentQuiz.text.includes("gn") && answer === "yes"
+                ? "🟢 Correct !"
+                : "🔴 Essayez encore"}
+            </p>
+          )}
+
+          <button
+            style={{ marginTop: 20 }}
+            onClick={() => setIndex((prev) => (prev + 1) % words.length)}
+          >
+            ➡ Question suivante
+          </button>
+        </>
       )}
     </main>
   );
