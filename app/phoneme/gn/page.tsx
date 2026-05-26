@@ -19,12 +19,15 @@ const words = [
 
 export default function GNPage() {
   const [index, setIndex] = useState(0);
+
   const [audioURL, setAudioURL] = useState("");
   const [score, setScore] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
 
   const [mode, setMode] = useState<"learn" | "quiz">("learn");
   const [answer, setAnswer] = useState<string | null>(null);
+
+  const [history, setHistory] = useState<number[]>([]);
 
   const chunksRef = useRef<Blob[]>([]);
 
@@ -59,6 +62,7 @@ export default function GNPage() {
       const randomScore = Math.floor(Math.random() * 4) + 7;
 
       setScore(randomScore);
+      setHistory((prev) => [...prev, randomScore]);
 
       if (randomScore >= 8) {
         setFeedback("🟢 Bonne prononciation !");
@@ -76,13 +80,24 @@ export default function GNPage() {
     }, 3000);
   };
 
-  const currentQuiz = words[index];
+  const nextWord = () => {
+    setIndex((prev) => (prev + 1) % words.length);
+    setAudioURL("");
+    setScore(null);
+    setFeedback("");
+    setAnswer(null);
+  };
+
+  const totalScore =
+    history.length > 0
+      ? Math.round(
+          history.reduce((a, b) => a + b, 0) / history.length
+        )
+      : null;
 
   return (
     <main style={{ padding: 40 }}>
       <h1>🇫🇷 Son /ɲ/</h1>
-
-      <p>Cliquez pour écouter puis enregistrer.</p>
 
       {/* MODE SWITCH */}
       <button
@@ -109,19 +124,8 @@ export default function GNPage() {
 
           <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
             <button onClick={playModel}>▶ Écouter</button>
-
             <button onClick={startRecording}>🎤 Enregistrer</button>
-
-            <button
-              onClick={() => {
-                setIndex((prev) => (prev + 1) % words.length);
-                setAudioURL("");
-                setScore(null);
-                setFeedback("");
-              }}
-            >
-              ➡ Suivant
-            </button>
+            <button onClick={nextWord}>➡ Suivant</button>
           </div>
 
           {score !== null && (
@@ -144,13 +148,21 @@ export default function GNPage() {
               <audio controls src={audioURL} />
             </div>
           )}
+
+          {/* PROGRESS */}
+          {totalScore !== null && (
+            <div style={{ marginTop: 30 }}>
+              <h3>📊 Average Score</h3>
+              <p>{totalScore}/10</p>
+            </div>
+          )}
         </>
       ) : (
         /* QUIZ MODE */
         <>
           <h2>Quel mot contient le son /ɲ/ ?</h2>
 
-          <h3>{currentQuiz.text}</h3>
+          <h3>{current.text}</h3>
 
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={() => setAnswer("yes")}>Oui</button>
@@ -159,16 +171,13 @@ export default function GNPage() {
 
           {answer && (
             <p style={{ marginTop: 10 }}>
-              {currentQuiz.text.includes("gn") && answer === "yes"
+              {current.text.includes("gn") && answer === "yes"
                 ? "🟢 Correct !"
                 : "🔴 Essayez encore"}
             </p>
           )}
 
-          <button
-            style={{ marginTop: 20 }}
-            onClick={() => setIndex((prev) => (prev + 1) % words.length)}
-          >
+          <button style={{ marginTop: 20 }} onClick={nextWord}>
             ➡ Question suivante
           </button>
         </>
