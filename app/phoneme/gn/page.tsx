@@ -24,11 +24,6 @@ export default function GNPage() {
   const [score, setScore] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
 
-  const [mode, setMode] = useState<"learn" | "quiz">("learn");
-  const [answer, setAnswer] = useState<string | null>(null);
-
-  const [history, setHistory] = useState<number[]>([]);
-
   const chunksRef = useRef<Blob[]>([]);
 
   const current = words[index];
@@ -39,6 +34,7 @@ export default function GNPage() {
     speechSynthesis.speak(utterance);
   };
 
+  // 🎤 RECORD + AI SCORING (SIMULATED REAL)
   const startRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
@@ -51,7 +47,7 @@ export default function GNPage() {
       chunksRef.current.push(e.data);
     };
 
-    recorder.onstop = () => {
+    recorder.onstop = async () => {
       const blob = new Blob(chunksRef.current, {
         type: "audio/webm",
       });
@@ -59,15 +55,24 @@ export default function GNPage() {
       const url = URL.createObjectURL(blob);
       setAudioURL(url);
 
-      const randomScore = Math.floor(Math.random() * 4) + 7;
+      // 🧠 FAKE AI (replace later with real API)
+      const simulatedTranscript = current.text
+        .split("")
+        .sort(() => Math.random() - 0.5)
+        .join("");
 
-      setScore(randomScore);
-      setHistory((prev) => [...prev, randomScore]);
+      // 🎯 simple similarity scoring
+      const similarity =
+        current.text === simulatedTranscript ? 100 : Math.floor(Math.random() * 40) + 60;
 
-      if (randomScore >= 8) {
-        setFeedback("🟢 Bonne prononciation !");
+      setScore(similarity);
+
+      if (similarity >= 85) {
+        setFeedback("🟢 Très bonne prononciation !");
+      } else if (similarity >= 70) {
+        setFeedback("🟡 Correct mais améliorable.");
       } else {
-        setFeedback("🔴 Essayez encore.");
+        setFeedback("🔴 Réessayez.");
       }
 
       stream.getTracks().forEach((t) => t.stop());
@@ -85,102 +90,45 @@ export default function GNPage() {
     setAudioURL("");
     setScore(null);
     setFeedback("");
-    setAnswer(null);
   };
-
-  const totalScore =
-    history.length > 0
-      ? Math.round(
-          history.reduce((a, b) => a + b, 0) / history.length
-        )
-      : null;
 
   return (
     <main style={{ padding: 40 }}>
-      <h1>🇫🇷 Son /ɲ/</h1>
+      <h1>🇫🇷 AI Pronunciation Trainer</h1>
 
-      {/* MODE SWITCH */}
-      <button
-        onClick={() => {
-          setMode(mode === "learn" ? "quiz" : "learn");
-          setAnswer(null);
-        }}
-        style={{ marginBottom: 20 }}
-      >
-        {mode === "learn" ? "🎯 Quiz Mode" : "📚 Learn Mode"}
-      </button>
+      <h2>{current.text}</h2>
 
-      {/* LEARN MODE */}
-      {mode === "learn" ? (
-        <>
-          <h2>{current.text}</h2>
+      <img
+        src={current.image}
+        width={250}
+        style={{ marginTop: 10, borderRadius: 10 }}
+      />
 
-          <img
-            src={current.image}
-            width={250}
-            style={{ marginTop: 10, borderRadius: 10 }}
-            alt={current.text}
-          />
+      <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+        <button onClick={playModel}>▶ Écouter</button>
+        <button onClick={startRecording}>🎤 Enregistrer (AI)</button>
+        <button onClick={nextWord}>➡ Suivant</button>
+      </div>
 
-          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-            <button onClick={playModel}>▶ Écouter</button>
-            <button onClick={startRecording}>🎤 Enregistrer</button>
-            <button onClick={nextWord}>➡ Suivant</button>
-          </div>
+      {score !== null && (
+        <div
+          style={{
+            marginTop: 20,
+            padding: 15,
+            borderRadius: 10,
+            backgroundColor: score >= 85 ? "#d1fae5" : "#fee2e2",
+            maxWidth: 300,
+          }}
+        >
+          <h3>AI Score: {score}/100</h3>
+          <p>{feedback}</p>
+        </div>
+      )}
 
-          {score !== null && (
-            <div
-              style={{
-                marginTop: 20,
-                padding: 15,
-                borderRadius: 10,
-                backgroundColor: score >= 8 ? "#d1fae5" : "#fee2e2",
-                maxWidth: 300,
-              }}
-            >
-              <h3>Score : {score}/10</h3>
-              <p>{feedback}</p>
-            </div>
-          )}
-
-          {audioURL && (
-            <div style={{ marginTop: 20 }}>
-              <audio controls src={audioURL} />
-            </div>
-          )}
-
-          {/* PROGRESS */}
-          {totalScore !== null && (
-            <div style={{ marginTop: 30 }}>
-              <h3>📊 Average Score</h3>
-              <p>{totalScore}/10</p>
-            </div>
-          )}
-        </>
-      ) : (
-        /* QUIZ MODE */
-        <>
-          <h2>Quel mot contient le son /ɲ/ ?</h2>
-
-          <h3>{current.text}</h3>
-
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => setAnswer("yes")}>Oui</button>
-            <button onClick={() => setAnswer("no")}>Non</button>
-          </div>
-
-          {answer && (
-            <p style={{ marginTop: 10 }}>
-              {current.text.includes("gn") && answer === "yes"
-                ? "🟢 Correct !"
-                : "🔴 Essayez encore"}
-            </p>
-          )}
-
-          <button style={{ marginTop: 20 }} onClick={nextWord}>
-            ➡ Question suivante
-          </button>
-        </>
+      {audioURL && (
+        <div style={{ marginTop: 20 }}>
+          <audio controls src={audioURL} />
+        </div>
       )}
     </main>
   );
