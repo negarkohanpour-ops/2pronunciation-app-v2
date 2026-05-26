@@ -65,31 +65,42 @@ export default function GNPage() {
 
         const data = await res.json();
 
-        const transcript = data.text?.toLowerCase() || "";
+        const spoken = (data.text || "").toLowerCase().trim();
         const target = current.text.toLowerCase();
 
-        let similarity = 0;
+        let scoreValue = 0;
 
-        if (transcript.includes(target)) {
-          similarity = 95;
-        } else if (transcript.length > 0) {
-          similarity = 60;
+        // 🧠 Advanced scoring (no transcript shown)
+        if (!spoken) {
+          scoreValue = 20;
+        } else if (spoken === target) {
+          scoreValue = 100;
+        } else if (spoken.includes(target.slice(0, 4))) {
+          scoreValue = 85;
+        } else if (spoken.length > 0) {
+          scoreValue = 60;
         } else {
-          similarity = 30;
+          scoreValue = 30;
         }
 
-        setScore(similarity);
+        setScore(scoreValue);
 
-        setFeedback(
-          similarity > 80
-            ? "🟢 Très bonne prononciation !"
-            : "🔴 J’ai entendu: " + transcript
-        );
+        // 💬 feedback (clean UX)
+        if (scoreValue >= 90) {
+          setFeedback("🟢 Parfait ! Excellente prononciation");
+        } else if (scoreValue >= 75) {
+          setFeedback("🟡 Bon travail, mais améliorable");
+        } else if (scoreValue >= 50) {
+          setFeedback("🔴 Essaie encore");
+        } else {
+          setFeedback("🔴 Aucun son détecté");
+        }
       } catch (err) {
         setScore(0);
-        setFeedback("❌ Error with AI transcription");
+        setFeedback("❌ Erreur AI transcription");
       }
 
+      chunksRef.current = [];
       stream.getTracks().forEach((t) => t.stop());
     };
 
