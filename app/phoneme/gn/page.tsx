@@ -11,7 +11,11 @@ export default function GNPage() {
   const [index, setIndex] = useState(0);
   const [audioURL, setAudioURL] =
     useState("");
+const [score, setScore] =
+  useState<number | null>(null);
 
+const [feedback, setFeedback] =
+  useState("");
   const chunksRef =
     useRef<Blob[]>([]);
 
@@ -65,7 +69,20 @@ export default function GNPage() {
           URL.createObjectURL(blob);
 
         setAudioURL(url);
+const randomScore =
+  Math.floor(Math.random() * 4) + 7;
 
+setScore(randomScore);
+
+if (randomScore >= 8) {
+  setFeedback(
+    "🟢 Bonne prononciation !"
+  );
+} else {
+  setFeedback(
+    "🔴 Essayez encore."
+  );
+}
         stream
           .getTracks()
           .forEach((t) =>
@@ -126,7 +143,26 @@ export default function GNPage() {
           ➡ Suivant
         </button>
       </div>
+{score !== null && (
+  <div
+    style={{
+      marginTop: 20,
+      padding: 15,
+      borderRadius: 10,
+      backgroundColor:
+        score >= 8
+          ? "#d1fae5"
+          : "#fee2e2",
+      maxWidth: 300,
+    }}
+  >
+    <h3>
+      Score : {score}/10
+    </h3>
 
+    <p>{feedback}</p>
+  </div>
+)}
       {audioURL && (
         <div
           style={{
