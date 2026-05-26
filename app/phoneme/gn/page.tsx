@@ -3,8 +3,18 @@
 import { useState, useRef } from "react";
 
 const words = [
-  "champignon",
-  "montagne",
+  {
+    text: "champignon",
+    image: "/images/champignon.jpg",
+  },
+  {
+    text: "montagne",
+    image: "/images/montagne.jpg",
+  },
+  {
+    text: "agneau",
+    image: "/images/agneau.jpg",
+  },
 ];
 
 export default function GNPage() {
@@ -19,8 +29,7 @@ const [feedback, setFeedback] =
   const chunksRef =
     useRef<Blob[]>([]);
 
-  const currentWord =
-    words[index];
+const current = words[index];
 
   const playModel = () => {
     const utterance =
@@ -108,12 +117,10 @@ if (randomScore >= 8) {
         puis enregistrer.
       </p>
 
-      <h2>{currentWord}</h2>
+<h2>{current.text}</h2>
 <img
-  src="/images/champignon.jpg"
-  alt="champignon"
+  src={current.image}
   width={250}
-  style={{ marginTop: 20, borderRadius: 10 }}
 />
       <div
         style={{
