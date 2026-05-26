@@ -7,17 +7,12 @@ const words = [
     text: "champignon",
     image: "/images/champignon.jpg",
 
-    ideal: [
-      "/ʃɑ̃.pi.ɲɔ̃/",
-    ],
-
-    acceptable: [
-      "/ʃam.pi.ɲɔ̃/",
-      "/ʃam.pi.ɲon/",
-      "/ʃɑ̃.pi.ɲon/",
-      "/ʃɑ̃.pi.njɔ̃/",
-      "/ʃɑ̃ː.pi.ɲɔ̃/",
-      "/ʃɑ̃.pi.ɲɔ̞̃/",
+    aliases: [
+      "champignon",
+      "champinyon",
+      "champinon",
+      "shampignon",
+      "shampinyon",
     ],
   },
 
@@ -25,18 +20,12 @@ const words = [
     text: "baignoire",
     image: "/images/baignoire.jpg",
 
-    ideal: [
-      "/bɛ.ɲwaʁ/",
-    ],
-
-    acceptable: [
-      "/bɛ.njwaʁ/",
-      "/be.ɲwaʁ/",
-      "/bɛ.ɲwaːʁ/",
-      "/beinwaʁ/",
-      "/benwaʁ/",
-      "/bɛ.ɲwaʁ̞/",
-      "/bɛː.ɲwaʁ/",
+    aliases: [
+      "baignoire",
+      "benoire",
+      "beinwar",
+      "bainoire",
+      "benwar",
     ],
   },
 
@@ -44,12 +33,11 @@ const words = [
     text: "cigogne",
     image: "/images/cigogne.jpg",
 
-    ideal: [
-      "/si.ɡɔɲ/",
-    ],
-
-    acceptable: [
-      "/si.ɡoɲ/",
+    aliases: [
+      "cigogne",
+      "sigogne",
+      "sigony",
+      "sigoɲ",
     ],
   },
 
@@ -57,14 +45,24 @@ const words = [
     text: "montagne",
     image: "/images/montagne.jpg",
 
-    ideal: [
-      "/mɔ̃.taɲ/",
+    aliases: [
+      "montagne",
+      "montanya",
+      "montagneu",
+      "montagneh",
     ],
+  },
 
-    acceptable: [
-      "/mɔn.taɲ/",
-      "/mon.taɲ/",
-      "/mõː.taɲ/",
+  {
+    text: "agneau",
+    image: "/images/agneau.jpg",
+
+    aliases: [
+      "agneau",
+      "agno",
+      "anyo",
+      "agneo",
+      "anyoe",
     ],
   },
 ];
@@ -86,7 +84,7 @@ export default function GNPage() {
 
   const current = words[index];
 
-  // 🔊 model pronunciation
+  // 🔊 native pronunciation
   const playModel = () => {
     const utterance =
       new SpeechSynthesisUtterance(
@@ -100,7 +98,7 @@ export default function GNPage() {
     );
   };
 
-  // 🎤 recording + AI scoring
+  // 🎤 record + AI
   const startRecording =
     async () => {
       const stream =
@@ -172,37 +170,61 @@ export default function GNPage() {
 
             let scoreValue = 0;
 
-            // 🟢 ideal
-            if (
-              spoken.includes(
-                current.text.toLowerCase()
-              )
-            ) {
-              scoreValue = 100;
+            // 🟢 PERFECT / CLOSE MATCH
+            const matched =
+              current.aliases.some(
+                (alias) =>
+                  spoken.includes(
+                    alias
+                  )
+              );
+
+            if (matched) {
+              scoreValue = 95;
             }
 
-            // 🟡 acceptable approximations
+            // 🟡 phonetic approximation
             else if (
               spoken.includes(
                 "gn"
               ) ||
               spoken.includes(
+                "ny"
+              ) ||
+              spoken.includes(
                 "ni"
               ) ||
               spoken.includes(
-                "ny"
+                "yo"
               )
             ) {
               scoreValue = 75;
             }
 
-            // 🔴 unacceptable
+            // 🟠 weak approximation
             else if (
               spoken.length > 0
             ) {
-              scoreValue = 40;
-            } else {
+              scoreValue = 45;
+            }
+
+            // 🔴 nothing detected
+            else {
               scoreValue = 10;
+            }
+
+            // 🎤 audio bonus
+            if (
+              chunksRef.current
+                .length > 15
+            ) {
+              scoreValue += 5;
+            }
+
+            if (
+              scoreValue > 100
+            ) {
+              scoreValue = 100;
             }
 
             setScore(
@@ -214,7 +236,7 @@ export default function GNPage() {
               scoreValue >= 90
             ) {
               setFeedback(
-                "🟢 Prononciation idéale"
+                "🟢 Très bonne prononciation"
               );
             } else if (
               scoreValue >= 70
@@ -222,16 +244,22 @@ export default function GNPage() {
               setFeedback(
                 "🟡 Prononciation acceptable"
               );
+            } else if (
+              scoreValue >= 40
+            ) {
+              setFeedback(
+                "🟠 Son proche mais incorrect"
+              );
             } else {
               setFeedback(
-                "🔴 Prononciation inacceptable"
+                "🔴 Prononciation incorrecte"
               );
             }
           } catch (err) {
             setScore(0);
 
             setFeedback(
-              "❌ AI error"
+              "❌ AI transcription error"
             );
           }
 
