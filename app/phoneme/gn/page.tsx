@@ -109,7 +109,7 @@ if (randomScore >= 8) {
       </p>
 
       <h2>{currentWord}</h2>
-<img src="/images/champignon.jpg" />
+<img src="/images/champignon.png" />
 />
       <div
         style={{
