@@ -110,10 +110,8 @@ if (randomScore >= 8) {
 
       <h2>{currentWord}</h2>
 <img
-  src="/images/champignon.jpg"
-  alt="champignon"
-  width={250}
-  style={{ marginTop: 20, borderRadius: 10 }}
+  src="https://upload.wikimedia.org/wikipedia/commons/6/60/Agaricus_bisporus.jpg"
+  width={200}
 />
 />
       <div
