@@ -109,7 +109,15 @@ if (randomScore >= 8) {
       </p>
 
       <h2>{currentWord}</h2>
-
+<img
+  src="https://upload.wikimedia.org/wikipedia/commons/6/60/Agaricus_bisporus.jpg"
+  alt="champignon"
+  width="250"
+  style={{
+    marginTop: 20,
+    borderRadius: 10,
+  }}
+/>
       <div
         style={{
           display: "flex",
