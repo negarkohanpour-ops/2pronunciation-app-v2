@@ -27,14 +27,12 @@ export default function GNPage() {
 
   const current = words[index];
 
-  // 🔊 model pronunciation
   const playModel = () => {
     const utterance = new SpeechSynthesisUtterance(current.text);
     utterance.lang = "fr-FR";
     speechSynthesis.speak(utterance);
   };
 
-  // 🎤 AI recording + scoring
   const startRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
@@ -65,46 +63,59 @@ export default function GNPage() {
 
         const data = await res.json();
 
-        // 🧠 SAFE AI OUTPUT
         const spoken = (data.text || "").toLowerCase().trim();
         const target = current.text.toLowerCase();
 
         const cleanSpoken = spoken.replace(/[^a-z]/g, "");
         const cleanTarget = target.replace(/[^a-z]/g, "");
 
-        let scoreValue = 0;
+        // 🧠 BASE SCORE
+        let baseScore = 0;
 
-        // 🧠 ADVANCED SCORING (stable + safe)
         if (!cleanSpoken) {
-          scoreValue = 15;
+          baseScore = 10;
         } else if (cleanSpoken === cleanTarget) {
-          scoreValue = 100;
-        } else if (cleanSpoken.startsWith(cleanTarget.slice(0, 3))) {
-          scoreValue = 85;
+          baseScore = 100;
+        } else if (cleanSpoken.includes(cleanTarget.slice(0, 4))) {
+          baseScore = 85;
         } else if (
           cleanSpoken.includes(cleanTarget) ||
           cleanTarget.includes(cleanSpoken)
         ) {
-          scoreValue = 70;
+          baseScore = 70;
         } else {
           const lenDiff = Math.abs(
             cleanSpoken.length - cleanTarget.length
           );
 
-          scoreValue = Math.max(35, 60 - lenDiff * 5);
+          baseScore = Math.max(30, 60 - lenDiff * 5);
         }
 
-        setScore(scoreValue);
+        // 🎤 AUDIO BONUS (simulated improvement)
+        const audioLength = chunksRef.current.length;
 
-        // 💬 feedback (no transcript shown)
-        if (scoreValue >= 90) {
-          setFeedback("🟢 Parfait ! Excellente prononciation");
-        } else if (scoreValue >= 75) {
-          setFeedback("🟡 Bon travail, continue");
-        } else if (scoreValue >= 50) {
-          setFeedback("🔴 À améliorer");
+        let audioBonus = 0;
+
+        if (audioLength > 15) audioBonus = 5;
+        if (audioLength > 25) audioBonus = 10;
+
+        // 📊 FINAL SCORE
+        const finalScore = Math.min(
+          100,
+          baseScore + audioBonus
+        );
+
+        setScore(finalScore);
+
+        // 💬 feedback
+        if (finalScore >= 90) {
+          setFeedback("🟢 Excellent pronunciation !");
+        } else if (finalScore >= 75) {
+          setFeedback("🟡 Good, but can improve");
+        } else if (finalScore >= 50) {
+          setFeedback("🔴 Not bad, try again");
         } else {
-          setFeedback("🔴 Réessayez");
+          setFeedback("🔴 Very weak pronunciation");
         }
       } catch (err) {
         setScore(0);
@@ -122,7 +133,6 @@ export default function GNPage() {
     }, 3000);
   };
 
-  // ⏭ next word
   const nextWord = () => {
     setIndex((prev) => (prev + 1) % words.length);
     setAudioURL("");
