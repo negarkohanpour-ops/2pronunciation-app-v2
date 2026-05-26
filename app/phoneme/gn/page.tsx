@@ -63,59 +63,65 @@ export default function GNPage() {
 
         const data = await res.json();
 
-        const spoken = (data.text || "").toLowerCase().trim();
+        const spokenRaw = (data.text || "").toLowerCase().trim();
         const target = current.text.toLowerCase();
 
-        const cleanSpoken = spoken.replace(/[^a-z]/g, "");
+        const spoken = spokenRaw.replace(/[^a-z]/g, "");
         const cleanTarget = target.replace(/[^a-z]/g, "");
 
-        // 🧠 BASE SCORE
+        // 🧠 STEP 1: base similarity
         let baseScore = 0;
 
-        if (!cleanSpoken) {
+        if (!spoken) {
           baseScore = 10;
-        } else if (cleanSpoken === cleanTarget) {
+        } else if (spoken === cleanTarget) {
           baseScore = 100;
-        } else if (cleanSpoken.includes(cleanTarget.slice(0, 4))) {
+        } else if (spoken.includes(cleanTarget.slice(0, 4))) {
           baseScore = 85;
         } else if (
-          cleanSpoken.includes(cleanTarget) ||
-          cleanTarget.includes(cleanSpoken)
+          spoken.includes(cleanTarget) ||
+          cleanTarget.includes(spoken)
         ) {
           baseScore = 70;
         } else {
-          const lenDiff = Math.abs(
-            cleanSpoken.length - cleanTarget.length
-          );
-
+          const lenDiff = Math.abs(spoken.length - cleanTarget.length);
           baseScore = Math.max(30, 60 - lenDiff * 5);
         }
 
-        // 🎤 AUDIO BONUS (simulated improvement)
-        const audioLength = chunksRef.current.length;
+        // 🧠 STEP 2: pronunciation penalty model
+        const wordLengthFactor = cleanTarget.length;
 
-        let audioBonus = 0;
+        let pronunciationPenalty = 0;
 
-        if (audioLength > 15) audioBonus = 5;
-        if (audioLength > 25) audioBonus = 10;
+        if (spoken.length < wordLengthFactor * 0.5) {
+          pronunciationPenalty = -15;
+        } else if (spoken.length > wordLengthFactor * 1.8) {
+          pronunciationPenalty = -10;
+        }
+
+        // 🧠 STEP 3: realism boost (Whisper reliability heuristic)
+        let realismBoost = 0;
+
+        if (spokenRaw.length > 0) realismBoost += 5;
+        if (spokenRaw.includes(cleanTarget.slice(0, 3))) realismBoost += 5;
 
         // 📊 FINAL SCORE
-        const finalScore = Math.min(
-          100,
-          baseScore + audioBonus
-        );
+        let finalScore = baseScore + pronunciationPenalty + realismBoost;
+
+        if (finalScore > 100) finalScore = 100;
+        if (finalScore < 0) finalScore = 0;
 
         setScore(finalScore);
 
-        // 💬 feedback
+        // 💬 smart feedback
         if (finalScore >= 90) {
-          setFeedback("🟢 Excellent pronunciation !");
+          setFeedback("🟢 Parfait ! Son natif presque");
         } else if (finalScore >= 75) {
-          setFeedback("🟡 Good, but can improve");
+          setFeedback("🟡 Bon accent, améliorable");
         } else if (finalScore >= 50) {
-          setFeedback("🔴 Not bad, try again");
+          setFeedback("🔴 Prononciation moyenne");
         } else {
-          setFeedback("🔴 Very weak pronunciation");
+          setFeedback("🔴 Trop éloigné du mot");
         }
       } catch (err) {
         setScore(0);
