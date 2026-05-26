@@ -27,14 +27,14 @@ export default function GNPage() {
 
   const current = words[index];
 
-  // 🔊 play correct pronunciation
+  // 🔊 model pronunciation
   const playModel = () => {
     const utterance = new SpeechSynthesisUtterance(current.text);
     utterance.lang = "fr-FR";
     speechSynthesis.speak(utterance);
   };
 
-  // 🎤 record + AI scoring
+  // 🎤 AI recording + scoring
   const startRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
@@ -65,39 +65,50 @@ export default function GNPage() {
 
         const data = await res.json();
 
+        // 🧠 SAFE AI OUTPUT
         const spoken = (data.text || "").toLowerCase().trim();
         const target = current.text.toLowerCase();
 
+        const cleanSpoken = spoken.replace(/[^a-z]/g, "");
+        const cleanTarget = target.replace(/[^a-z]/g, "");
+
         let scoreValue = 0;
 
-        // 🧠 Advanced scoring (no transcript shown)
-        if (!spoken) {
-          scoreValue = 20;
-        } else if (spoken === target) {
+        // 🧠 ADVANCED SCORING (stable + safe)
+        if (!cleanSpoken) {
+          scoreValue = 15;
+        } else if (cleanSpoken === cleanTarget) {
           scoreValue = 100;
-        } else if (spoken.includes(target.slice(0, 4))) {
+        } else if (cleanSpoken.startsWith(cleanTarget.slice(0, 3))) {
           scoreValue = 85;
-        } else if (spoken.length > 0) {
-          scoreValue = 60;
+        } else if (
+          cleanSpoken.includes(cleanTarget) ||
+          cleanTarget.includes(cleanSpoken)
+        ) {
+          scoreValue = 70;
         } else {
-          scoreValue = 30;
+          const lenDiff = Math.abs(
+            cleanSpoken.length - cleanTarget.length
+          );
+
+          scoreValue = Math.max(35, 60 - lenDiff * 5);
         }
 
         setScore(scoreValue);
 
-        // 💬 feedback (clean UX)
+        // 💬 feedback (no transcript shown)
         if (scoreValue >= 90) {
           setFeedback("🟢 Parfait ! Excellente prononciation");
         } else if (scoreValue >= 75) {
-          setFeedback("🟡 Bon travail, mais améliorable");
+          setFeedback("🟡 Bon travail, continue");
         } else if (scoreValue >= 50) {
-          setFeedback("🔴 Essaie encore");
+          setFeedback("🔴 À améliorer");
         } else {
-          setFeedback("🔴 Aucun son détecté");
+          setFeedback("🔴 Réessayez");
         }
       } catch (err) {
         setScore(0);
-        setFeedback("❌ Erreur AI transcription");
+        setFeedback("❌ AI error");
       }
 
       chunksRef.current = [];
@@ -111,6 +122,7 @@ export default function GNPage() {
     }, 3000);
   };
 
+  // ⏭ next word
   const nextWord = () => {
     setIndex((prev) => (prev + 1) % words.length);
     setAudioURL("");
