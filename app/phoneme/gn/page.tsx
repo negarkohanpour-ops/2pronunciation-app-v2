@@ -35,12 +35,14 @@ const words = [
   },
 ];
 
+type Mastery = "weak" | "learning" | "mastered";
+
 export default function GNPage() {
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
-  const [audioURL, setAudioURL] = useState("");
   const [analysis, setAnalysis] = useState<string[]>([]);
+  const [mastery, setMastery] = useState<Record<string, Mastery>>({});
 
   const chunksRef = useRef<Blob[]>([]);
   const current = words[index];
@@ -52,45 +54,60 @@ export default function GNPage() {
     speechSynthesis.speak(utterance);
   };
 
-  // 🧠 phonetic analysis (PHASE 4)
+  // 🧠 ANALYSIS ENGINE (PHASE 5)
   const analyze = (spoken: string) => {
     const s = spoken.toLowerCase();
-    const issues: string[] = [];
-    let score = 30;
 
-    // 🟢 full match boost
+    let score = 30;
+    const issues: string[] = [];
+    const syllableHits: Record<string, boolean> = {};
+
+    // 🟢 full match
     if (s.includes(current.text.toLowerCase())) {
       score = 95;
     }
 
-    // 🧠 detect /ɲ/ sound weakness
-    const hasGN = s.includes("gn") || s.includes("ni") || s.includes("ny");
+    // 🧠 /ɲ/ detection
+    const hasGN =
+      s.includes("gn") || s.includes("ni") || s.includes("ny");
 
     if (hasGN) {
       score += 25;
     } else {
-      issues.push("❌ Son /ɲ/ (gn) absent ou faible");
+      issues.push("Son /ɲ/ absent ou incorrect");
     }
 
-    // 🧠 syllable check
-    let correctSyllables = 0;
+    // 🧠 syllables
+    let correct = 0;
 
     current.syllables.forEach((syll) => {
-      if (s.includes(syll.replace(/-/g, ""))) {
-        correctSyllables++;
-      } else {
-        issues.push(`❌ Syllabe manquante: ${syll}`);
-      }
+      const clean = syll.replace(/-/g, "");
+      const ok = s.includes(clean);
+
+      syllableHits[syll] = ok;
+
+      if (ok) correct++;
+      else issues.push(`Syllabe manquante: ${syll}`);
     });
 
-    score += correctSyllables * 10;
-
-    // 🟡 fluency heuristic
-    if (s.length > 4) score += 10;
+    score += correct * 10;
 
     if (score > 100) score = 100;
 
-    return { score, issues };
+    return { score, issues, syllableHits };
+  };
+
+  // 🧠 mastery system
+  const updateMastery = (word: string, score: number) => {
+    let level: Mastery = "weak";
+
+    if (score >= 85) level = "mastered";
+    else if (score >= 60) level = "learning";
+
+    setMastery((prev) => ({
+      ...prev,
+      [word]: level,
+    }));
   };
 
   // 🎤 recording
@@ -111,8 +128,6 @@ export default function GNPage() {
         type: "audio/webm",
       });
 
-      setAudioURL(URL.createObjectURL(blob));
-
       try {
         const formData = new FormData();
         formData.append("file", blob, "audio.webm");
@@ -130,28 +145,28 @@ export default function GNPage() {
         setScore(result.score);
         setAnalysis(result.issues);
 
-        // 💬 teacher feedback
-        if (result.issues.length === 0) {
-          setFeedback("🟢 Excellent ! Prononciation très correcte");
-        } else if (result.issues.length <= 2) {
-          setFeedback("🟡 Bon, mais quelques erreurs");
+        updateMastery(current.text, result.score);
+
+        // 💬 AI-style feedback
+        if (result.score >= 85) {
+          setFeedback("🟢 Excellent pronunciation !");
+        } else if (result.score >= 70) {
+          setFeedback("🟡 Good, but refine nasal sound /ɲ/");
+        } else if (result.score >= 50) {
+          setFeedback("🟠 Keep practicing syllables");
         } else {
-          setFeedback("🔴 À travailler davantage");
+          setFeedback("🔴 Focus on pronunciation slow repetition");
         }
       } catch (err) {
         setScore(0);
         setFeedback("Erreur transcription");
-        setAnalysis([]);
       }
 
       stream.getTracks().forEach((t) => t.stop());
     };
 
     recorder.start();
-
-    setTimeout(() => {
-      recorder.stop();
-    }, 3000);
+    setTimeout(() => recorder.stop(), 3000);
   };
 
   const nextWord = () => {
@@ -159,52 +174,82 @@ export default function GNPage() {
     setScore(null);
     setFeedback("");
     setAnalysis([]);
-    setAudioURL("");
   };
 
-  const repeatWeak = () => {
-    const weak = analysis.find((a) => a.includes("ɲ") || a.includes("Syllabe"));
-    if (weak) {
-      alert("🔁 Répéter la prononciation lente du mot");
-      playModel();
-    }
+  // 🧠 AI hint system
+  const getHint = () => {
+    if (score === null) return "🎧 Écoutez d'abord le modèle";
+    if (score < 50) return "👉 Prononce lentement chaque syllabe";
+    if (score < 80) return "👉 Focus sur le son nasal /ɲ/";
+    return "✅ Très bon niveau, continuez";
+  };
+
+  const getColor = (syll: string, ok?: boolean) => {
+    if (ok === undefined) return "#eee";
+    return ok ? "#bbf7d0" : "#fecaca";
   };
 
   return (
     <main style={{ padding: 40 }}>
-      <h1>🇫🇷 AI Pronunciation Trainer — Phase 4</h1>
+      <h1>🇫🇷 AI Pronunciation Coach — Phase 5</h1>
+
+      {/* 📊 dashboard */}
+      <div style={{ marginBottom: 15 }}>
+        <h3>📊 Progress Dashboard</h3>
+        <ul>
+          {words.map((w) => (
+            <li key={w.text}>
+              {w.text} →{" "}
+              {mastery[w.text] || "not tested"}
+            </li>
+          ))}
+        </ul>
+      </div>
 
       <h2>{current.text}</h2>
 
-      {/* 🧠 syllable visualization */}
-      <div style={{ display: "flex", gap: 5, marginBottom: 10 }}>
-        {current.syllables.map((syll, i) => (
-          <span
-            key={i}
-            style={{
-              padding: "5px 10px",
-              borderRadius: 6,
-              background: "#eee",
-              fontWeight: 600,
-            }}
-          >
-            {syll}
-          </span>
-        ))}
+      {/* 🧩 syllable heatmap */}
+      <div style={{ display: "flex", gap: 5 }}>
+        {current.syllables.map((syll) => {
+          const ok =
+            analysis.length === 0
+              ? undefined
+              : !analysis.some((a) =>
+                  a.includes(syll)
+                );
+
+          return (
+            <span
+              key={syll}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 6,
+                background: getColor(syll, ok),
+                fontWeight: 600,
+              }}
+            >
+              {syll}
+            </span>
+          );
+        })}
       </div>
 
       <img
         src={current.image}
         width={250}
-        style={{ borderRadius: 10 }}
+        style={{ marginTop: 10, borderRadius: 10 }}
       />
 
       <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
         <button onClick={playModel}>▶ Écouter</button>
         <button onClick={startRecording}>🎤 Enregistrer</button>
         <button onClick={nextWord}>➡ Suivant</button>
-        <button onClick={repeatWeak}>🔁 Répéter</button>
       </div>
+
+      {/* 🧠 hint engine */}
+      <p style={{ marginTop: 10, fontStyle: "italic" }}>
+        {getHint()}
+      </p>
 
       {score !== null && (
         <div
@@ -212,14 +257,14 @@ export default function GNPage() {
             marginTop: 20,
             padding: 15,
             borderRadius: 10,
-            backgroundColor: score >= 70 ? "#d1fae5" : "#fee2e2",
+            backgroundColor:
+              score >= 70 ? "#d1fae5" : "#fee2e2",
             maxWidth: 500,
           }}
         >
           <h3>Score: {score}/100</h3>
           <p>{feedback}</p>
 
-          {/* 🧠 teacher-style analysis */}
           {analysis.length > 0 && (
             <ul>
               {analysis.map((a, i) => (
@@ -227,12 +272,6 @@ export default function GNPage() {
               ))}
             </ul>
           )}
-        </div>
-      )}
-
-      {audioURL && (
-        <div style={{ marginTop: 20 }}>
-          <audio controls src={audioURL} />
         </div>
       )}
     </main>
