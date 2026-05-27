@@ -90,7 +90,9 @@ export async function POST(req: Request) {
       montagne: ["gn"],
     };
 
-    const h = hints[t] || [];
+   const h = Object.keys(hints).includes(t)
+  ? hints[t as keyof typeof hints]
+  : [];
 
     let match = 0;
 
