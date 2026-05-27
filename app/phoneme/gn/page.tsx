@@ -7,14 +7,13 @@ const words = [
     text: "champignon",
     image: "/images/champignon.jpg",
 
-    idealIPA: "/ʃɑ̃.pi.ɲɔ̃/",
-
     aliases: [
       "champignon",
       "champinyon",
       "champinon",
       "shampignon",
       "shampinyon",
+      "champignion",
     ],
   },
 
@@ -22,13 +21,13 @@ const words = [
     text: "baignoire",
     image: "/images/baignoire.jpg",
 
-    idealIPA: "/bɛ.ɲwaʁ/",
-
     aliases: [
       "baignoire",
       "benoire",
       "beinwar",
       "benwar",
+      "bainoire",
+      "beignoire",
     ],
   },
 
@@ -36,12 +35,11 @@ const words = [
     text: "cigogne",
     image: "/images/cigogne.jpg",
 
-    idealIPA: "/si.ɡɔɲ/",
-
     aliases: [
       "cigogne",
       "sigogne",
       "sigony",
+      "sigone",
     ],
   },
 
@@ -49,12 +47,12 @@ const words = [
     text: "montagne",
     image: "/images/montagne.jpg",
 
-    idealIPA: "/mɔ̃.taɲ/",
-
     aliases: [
       "montagne",
       "montanya",
       "montagneu",
+      "montane",
+      "montagneh",
     ],
   },
 
@@ -62,13 +60,14 @@ const words = [
     text: "agneau",
     image: "/images/agneau.jpg",
 
-    idealIPA: "/a.ɲo/",
-
     aliases: [
       "agneau",
       "agno",
       "anyo",
       "agneo",
+      "anyoe",
+      "agnoo",
+      "anyoe",
     ],
   },
 ];
@@ -90,7 +89,7 @@ export default function GNPage() {
 
   const current = words[index];
 
-  // 🔊 pronunciation model
+  // 🔊 native model
   const playModel = () => {
     const utterance =
       new SpeechSynthesisUtterance(
@@ -104,41 +103,44 @@ export default function GNPage() {
     );
   };
 
-  // 🧠 phonetic similarity
+  // 🧠 smarter tolerant scoring
   const getSimilarityScore = (
     spoken: string
   ) => {
     const lower =
       spoken.toLowerCase();
 
-    // 🟢 alias match
-    const matched =
+    // 🟢 close aliases
+    const aliasMatch =
       current.aliases.some(
         (alias) =>
           lower.includes(alias)
       );
 
-    if (matched) {
+    if (aliasMatch) {
       return 95;
     }
 
-    // 🟡 phonetic approximations
+    // 🟢 strong phonetic hints
     if (
       lower.includes("gn") ||
       lower.includes("ny") ||
-      lower.includes("ni") ||
-      lower.includes("yo")
+      lower.includes("nio") ||
+      lower.includes("yo") ||
+      lower.includes("ni")
     ) {
-      return 75;
+      return 82;
     }
 
-    // 🟠 weak speech detected
-    if (lower.length > 2) {
-      return 45;
+    // 🟡 partial similarity
+    if (
+      lower.length >= 3
+    ) {
+      return 65;
     }
 
-    // 🔴 almost nothing
-    return 10;
+    // 🔴 weak
+    return 35;
   };
 
   // 🎤 recording
@@ -216,14 +218,15 @@ export default function GNPage() {
                 spoken
               );
 
-            // 🎤 audio realism bonus
+            // 🎤 audio confidence bonus
             if (
               chunksRef.current
-                .length > 15
+                .length > 10
             ) {
               scoreValue += 5;
             }
 
+            // 📊 cap
             if (
               scoreValue > 100
             ) {
@@ -239,23 +242,23 @@ export default function GNPage() {
               scoreValue >= 90
             ) {
               setFeedback(
-                "🟢 Prononciation excellente"
+                "🟢 Très bonne prononciation"
               );
             } else if (
-              scoreValue >= 70
+              scoreValue >= 75
             ) {
               setFeedback(
-                "🟡 Prononciation acceptable"
+                "🟡 Bonne prononciation"
               );
             } else if (
-              scoreValue >= 40
+              scoreValue >= 55
             ) {
               setFeedback(
-                "🟠 Prononciation proche"
+                "🟠 Prononciation acceptable"
               );
             } else {
               setFeedback(
-                "🔴 Prononciation incorrecte"
+                "🔴 Essayez encore"
               );
             }
           } catch (err) {
@@ -283,7 +286,7 @@ export default function GNPage() {
       }, 3000);
     };
 
-  // ⏭ next
+  // ⏭ next word
   const nextWord = () => {
     setIndex(
       (prev) =>
@@ -311,12 +314,6 @@ export default function GNPage() {
       <h2>
         {current.text}
       </h2>
-
-      <p>
-        IPA idéale:
-        {" "}
-        {current.idealIPA}
-      </p>
 
       <img
         src={current.image}
@@ -363,7 +360,7 @@ export default function GNPage() {
             padding: 15,
             borderRadius: 10,
             backgroundColor:
-              score >= 80
+              score >= 75
                 ? "#d1fae5"
                 : "#fee2e2",
             maxWidth: 350,
