@@ -30,21 +30,23 @@ export default function GNPage() {
   const [score, setScore] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
   const [audioURL, setAudioURL] = useState("");
-
-  const [history, setHistory] = useState<number[]>([]);
+  const [attemptKey, setAttemptKey] = useState(0);
 
   const chunksRef = useRef<Blob[]>([]);
   const current = words[index];
 
-  // 🔊 modèle audio
+  // 🔊 écouter modèle
   const playModel = () => {
     const utterance = new SpeechSynthesisUtterance(current.text);
     utterance.lang = "fr-FR";
     speechSynthesis.speak(utterance);
   };
 
-  // 🎤 enregistrement stable
+  // 🎤 enregistrer
   const startRecording = async () => {
+    setScore(null);
+    setFeedback("");
+
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
     });
@@ -75,7 +77,9 @@ export default function GNPage() {
 
         const data = await res.json();
 
-        const spoken = (data.text || "").toLowerCase().trim();
+        const spoken = (data.text || "")
+          .toLowerCase()
+          .replace(/\s/g, "");
 
         // 2️⃣ scoring
         const res2 = await fetch("/api/score", {
@@ -83,6 +87,7 @@ export default function GNPage() {
           body: JSON.stringify({
             spoken,
             target: current.text,
+            attempt: attemptKey,
           }),
           headers: {
             "Content-Type": "application/json",
@@ -93,17 +98,16 @@ export default function GNPage() {
         const finalScore = result.score;
 
         setScore(finalScore);
-        setHistory((h) => [...h, finalScore]);
 
-        // 🇫🇷 feedback FR
+        // 🇫🇷 feedback stable
         if (finalScore >= 85) {
-          setFeedback("🟢 Excellente prononciation (niveau natif)");
+          setFeedback("🟢 Excellente prononciation !");
         } else if (finalScore >= 70) {
           setFeedback("🟡 Bon, mais améliore l’articulation");
         } else if (finalScore >= 50) {
           setFeedback("🟠 Compréhensible mais manque de clarté");
         } else {
-          setFeedback("🔴 Répétez lentement et clairement");
+          setFeedback("🔴 Réessayez lentement et clairement");
         }
       } catch (err) {
         setScore(0);
@@ -120,48 +124,40 @@ export default function GNPage() {
     }, 3000);
   };
 
-  // ➡️ mot suivant (reset کامل)
+  // ➡️ next word
   const nextWord = () => {
     setIndex((p) => (p + 1) % words.length);
     setScore(null);
     setFeedback("");
     setAudioURL("");
+    setAttemptKey(0);
   };
 
-  // 📊 trend
-  const getTrend = () => {
-    if (history.length < 2) return "stable";
-
-    const last = history[history.length - 1];
-    const prev = history[history.length - 2];
-
-    if (last > prev) return "📈 amélioration";
-    if (last < prev) return "📉 baisse";
-    return "➡ stable";
+  // 🔁 retry same word
+  const retrySameWord = () => {
+    setScore(null);
+    setFeedback("");
+    setAudioURL("");
+    setAttemptKey((k) => k + 1);
   };
 
   return (
     <main style={{ padding: 40 }}>
       <h1>🇫🇷 Coach de Prononciation IA</h1>
 
-      <div style={{ marginBottom: 20 }}>
-        <h3>📊 Statistiques</h3>
-        <p>Score précédent: {history[history.length - 2] || "-"}</p>
-        <p>Tendance: {getTrend()}</p>
-      </div>
-
-      <h2>{current.text}</h2>
+      <h2 style={{ marginTop: 20 }}>{current.text}</h2>
 
       <img
         src={current.image}
         width={250}
-        style={{ borderRadius: 10, marginTop: 10 }}
+        style={{ marginTop: 10, borderRadius: 10 }}
         alt={current.text}
       />
 
       <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
         <button onClick={playModel}>▶ Écouter</button>
         <button onClick={startRecording}>🎤 Enregistrer</button>
+        <button onClick={retrySameWord}>🔁 Réessayer</button>
         <button onClick={nextWord}>➡ Suivant</button>
       </div>
 
