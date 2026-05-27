@@ -1,64 +1,32 @@
 import { NextResponse } from "next/server";
 
-// 🧠 pronunciation DB
-const pronunciationDB: any = {
-  champignon: {
-    ideal: ["/ʃɑ̃.pi.ɲɔ̃/"],
-    acceptable: [
-      "/ʃam.pi.ɲɔ̃/",
-      "/ʃam.pi.ɲon/",
-      "/ʃɑ̃.pi.ɲon/",
-      "/ʃɑ̃.pi.njɔ̃/",
-    ],
-  },
-
-  baignoire: {
-    ideal: ["/bɛ.ɲwaʁ/"],
-    acceptable: ["/bɛ.njwaʁ/", "/be.ɲwaʁ/", "/benwaʁ/"],
-  },
-
-  cigogne: {
-    ideal: ["/si.ɡɔɲ/"],
-    acceptable: ["/si.ɡoɲ/"],
-  },
-
-  montagne: {
-    ideal: ["/mɔ̃.taɲ/"],
-    acceptable: ["/mon.taɲ/", "/mɔn.taɲ/"],
-  },
+const rules: Record<string, { ok: string[] }> = {
+  champignon: { ok: ["champignon", "champinon", "shampion", "champinjon"] },
+  baignoire: { ok: ["baignoire", "benoire", "benwar", "bainoire"] },
+  cigogne: { ok: ["cigogne", "sigogne", "sigon"] },
+  montagne: { ok: ["montagne", "montan", "montani", "montaigne"] },
+  agneau: { ok: ["agneau", "anyo", "anjo", "agneo"] },
 };
 
 export async function POST(req: Request) {
   const { spoken, target } = await req.json();
 
+  const s = (spoken || "").toLowerCase().replace(/\s/g, "");
   const t = (target || "").toLowerCase();
-  const s = (spoken || "").toLowerCase();
 
-  const entry = pronunciationDB[t];
+  const rule = rules[t];
 
   let score = 40;
 
-  if (entry) {
-    const normalized = s.replace(/\s+/g, "");
+  if (rule) {
+    const match = rule.ok.some((w) => s.includes(w));
 
-    // 🟢 ideal match
-    if (
-      entry.ideal?.some((p: string) =>
-        normalized.includes(p.replace(/\//g, "").replace(/\./g, ""))
-      )
-    ) {
-      score = 100;
-    }
-
-    // 🟡 acceptable match
-    else if (
-      entry.acceptable?.some((p: string) =>
-        normalized.includes(p.replace(/\//g, "").replace(/\./g, ""))
-      )
-    ) {
-      score = 85;
+    if (match) {
+      score = 95; // 👈 قبول تلفظ درست
+    } else if (s.length > 0) {
+      score = 60;
     } else {
-      score = 50;
+      score = 20;
     }
   }
 
