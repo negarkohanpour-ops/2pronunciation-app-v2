@@ -1,68 +1,109 @@
 import { NextResponse } from "next/server";
 
-export async function POST(req: Request) {
-  try {
-    const { spoken, target } = await req.json();
-
-    const s = (spoken || "").toLowerCase().trim();
-    const t = (target || "").toLowerCase().trim();
-
-    let score = 0;
-
-    // 🧠 1. exact match (very strong)
-    if (s === t) {
-      score = 100;
-    }
-
-    // 🧠 2. close match
-    else if (s.includes(t) || t.includes(s)) {
-      score = 80;
-    }
-
-    // 🧠 3. partial similarity (word overlap)
-    else {
-      const sWords = s.split(" ");
-      const tWords = t.split(" ");
-
-      let match = 0;
-
-      for (const w of sWords) {
-        if (tWords.includes(w)) match++;
-      }
-
-      score = Math.round((match / Math.max(tWords.length, 1)) * 70 + 30);
-    }
-
-    // 🧠 4. phoneme bonus (French nasal /ɲ/ etc.)
-    if (t.includes("gn")) {
-      if (s.includes("gn") || s.includes("ni") || s.includes("ny")) {
-        score += 10;
-      } else {
-        score -= 10;
-      }
-    }
-
-    if (t.includes("an") || t.includes("en")) {
-      if (s.includes("an") || s.includes("en") || s.includes("am")) {
-        score += 5;
-      }
-    }
-
-    // 🧠 5. penalty for too different length
-    const diff = Math.abs(s.length - t.length);
-    score -= diff * 1.5;
-
-    // 🔒 clamp
-    if (score > 100) score = 100;
-    if (score < 0) score = 0;
-
-    return NextResponse.json({
-      score,
-    });
-  } catch (err) {
-    return NextResponse.json(
-      { error: "Erreur de scoring" },
-      { status: 500 }
-    );
+// 🧠 pronunciation database (your rules)
+const pronunciationDB: Record<
+  string,
+  {
+    ideal: string[];
+    acceptable: string[];
   }
+> = {
+  champignon: {
+    ideal: ["/ʃɑ̃.pi.ɲɔ̃/"],
+    acceptable: [
+      "/ʃam.pi.ɲɔ̃/",
+      "/ʃam.pi.ɲon/",
+      "/ʃɑ̃.pi.ɲon/",
+      "/ʃɑ̃.pi.njɔ̃/",
+      "/ʃɑ̃ː.pi.ɲɔ̃/",
+      "/ʃɑ̃.pi.ɲɔ̞̃/",
+    ],
+  },
+
+  baignoire: {
+    ideal: ["/bɛ.ɲwaʁ/"],
+    acceptable: [
+      "/bɛ.njwaʁ/",
+      "/be.ɲwaʁ/",
+      "/bɛ.ɲwaːʁ/",
+      "/beinwaʁ/",
+      "/benwaʁ/",
+      "/bɛ.ɲwaʁ̞/",
+      "/bɛː.ɲwaʁ/",
+    ],
+  },
+
+  cigogne: {
+    ideal: ["/si.ɡɔɲ/"],
+    acceptable: ["/si.ɡoɲ/"],
+  },
+
+  montagne: {
+    ideal: ["/mɔ̃.taɲ/"],
+    acceptable: ["/mɔn.taɲ/", "/mon.taɲ/", "/mõː.taɲ/"],
+  },
+};
+
+export async function POST(req: Request) {
+  const { spoken, target } = await req.json();
+
+  const t = target.toLowerCase();
+  const s = spoken.toLowerCase();
+
+  const entry = pronunciationDB[t];
+
+  if (!entry) {
+    return NextResponse.json({ score: 50 });
+  }
+
+  // 🧠 normalize spoken (very important)
+  const normalized = s
+    .replace(/\s+/g, "")
+    .replace(/[^\wɲɑ̃ɔɛœʃʒ]/g, "");
+
+  let score = 0;
+
+  // 🟢 ideal match = 100
+  if (
+    entry.ideal.some((p) =>
+      normalized.includes(p.replace(/\//g, "").replace(/\./g, ""))
+    )
+  ) {
+    score = 100;
+  }
+
+  // 🟡 acceptable match = 80–90
+  else if (
+    entry.acceptable.some((p) =>
+      normalized.includes(p.replace(/\//g, "").replace(/\./g, ""))
+    )
+  ) {
+    score = 85;
+  }
+
+  // 🟠 partial phoneme hint
+  else {
+    const hints = {
+      champignon: ["gn", "ni"],
+      baignoire: ["gn", "wa"],
+      cigogne: ["gn"],
+      montagne: ["gn"],
+    };
+
+    const h = hints[t] || [];
+
+    let match = 0;
+
+    h.forEach((x) => {
+      if (s.includes(x)) match++;
+    });
+
+    score = 40 + match * 10;
+  }
+
+  // 🔒 clamp
+  if (score > 100) score = 100;
+  if (score < 0) score = 0;
+
+  return NextResponse.json({ score });
 }
