@@ -7,6 +7,8 @@ const words = [
     text: "champignon",
     image: "/images/champignon.jpg",
 
+    idealIPA: "/ʃɑ̃.pi.ɲɔ̃/",
+
     aliases: [
       "champignon",
       "champinyon",
@@ -20,11 +22,12 @@ const words = [
     text: "baignoire",
     image: "/images/baignoire.jpg",
 
+    idealIPA: "/bɛ.ɲwaʁ/",
+
     aliases: [
       "baignoire",
       "benoire",
       "beinwar",
-      "bainoire",
       "benwar",
     ],
   },
@@ -33,11 +36,12 @@ const words = [
     text: "cigogne",
     image: "/images/cigogne.jpg",
 
+    idealIPA: "/si.ɡɔɲ/",
+
     aliases: [
       "cigogne",
       "sigogne",
       "sigony",
-      "sigoɲ",
     ],
   },
 
@@ -45,11 +49,12 @@ const words = [
     text: "montagne",
     image: "/images/montagne.jpg",
 
+    idealIPA: "/mɔ̃.taɲ/",
+
     aliases: [
       "montagne",
       "montanya",
       "montagneu",
-      "montagneh",
     ],
   },
 
@@ -57,12 +62,13 @@ const words = [
     text: "agneau",
     image: "/images/agneau.jpg",
 
+    idealIPA: "/a.ɲo/",
+
     aliases: [
       "agneau",
       "agno",
       "anyo",
       "agneo",
-      "anyoe",
     ],
   },
 ];
@@ -84,7 +90,7 @@ export default function GNPage() {
 
   const current = words[index];
 
-  // 🔊 native pronunciation
+  // 🔊 pronunciation model
   const playModel = () => {
     const utterance =
       new SpeechSynthesisUtterance(
@@ -98,7 +104,44 @@ export default function GNPage() {
     );
   };
 
-  // 🎤 record + AI
+  // 🧠 phonetic similarity
+  const getSimilarityScore = (
+    spoken: string
+  ) => {
+    const lower =
+      spoken.toLowerCase();
+
+    // 🟢 alias match
+    const matched =
+      current.aliases.some(
+        (alias) =>
+          lower.includes(alias)
+      );
+
+    if (matched) {
+      return 95;
+    }
+
+    // 🟡 phonetic approximations
+    if (
+      lower.includes("gn") ||
+      lower.includes("ny") ||
+      lower.includes("ni") ||
+      lower.includes("yo")
+    ) {
+      return 75;
+    }
+
+    // 🟠 weak speech detected
+    if (lower.length > 2) {
+      return 45;
+    }
+
+    // 🔴 almost nothing
+    return 10;
+  };
+
+  // 🎤 recording
   const startRecording =
     async () => {
       const stream =
@@ -168,52 +211,12 @@ export default function GNPage() {
                 .toLowerCase()
                 .trim();
 
-            let scoreValue = 0;
-
-            // 🟢 PERFECT / CLOSE MATCH
-            const matched =
-              current.aliases.some(
-                (alias) =>
-                  spoken.includes(
-                    alias
-                  )
+            let scoreValue =
+              getSimilarityScore(
+                spoken
               );
 
-            if (matched) {
-              scoreValue = 95;
-            }
-
-            // 🟡 phonetic approximation
-            else if (
-              spoken.includes(
-                "gn"
-              ) ||
-              spoken.includes(
-                "ny"
-              ) ||
-              spoken.includes(
-                "ni"
-              ) ||
-              spoken.includes(
-                "yo"
-              )
-            ) {
-              scoreValue = 75;
-            }
-
-            // 🟠 weak approximation
-            else if (
-              spoken.length > 0
-            ) {
-              scoreValue = 45;
-            }
-
-            // 🔴 nothing detected
-            else {
-              scoreValue = 10;
-            }
-
-            // 🎤 audio bonus
+            // 🎤 audio realism bonus
             if (
               chunksRef.current
                 .length > 15
@@ -236,7 +239,7 @@ export default function GNPage() {
               scoreValue >= 90
             ) {
               setFeedback(
-                "🟢 Très bonne prononciation"
+                "🟢 Prononciation excellente"
               );
             } else if (
               scoreValue >= 70
@@ -248,7 +251,7 @@ export default function GNPage() {
               scoreValue >= 40
             ) {
               setFeedback(
-                "🟠 Son proche mais incorrect"
+                "🟠 Prononciation proche"
               );
             } else {
               setFeedback(
@@ -259,7 +262,7 @@ export default function GNPage() {
             setScore(0);
 
             setFeedback(
-              "❌ AI transcription error"
+              "❌ AI error"
             );
           }
 
@@ -280,7 +283,7 @@ export default function GNPage() {
       }, 3000);
     };
 
-  // ⏭ next word
+  // ⏭ next
   const nextWord = () => {
     setIndex(
       (prev) =>
@@ -308,6 +311,12 @@ export default function GNPage() {
       <h2>
         {current.text}
       </h2>
+
+      <p>
+        IPA idéale:
+        {" "}
+        {current.idealIPA}
+      </p>
 
       <img
         src={current.image}
