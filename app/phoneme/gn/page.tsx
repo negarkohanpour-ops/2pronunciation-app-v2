@@ -6,22 +6,27 @@ const words = [
   {
     text: "champignon",
     image: "/images/champignon.jpg",
+    syllables: "cham-pi-gnon",
   },
   {
     text: "baignoire",
     image: "/images/baignoire.jpg",
+    syllables: "bai-gnoi-re",
   },
   {
     text: "cigogne",
     image: "/images/cigogne.jpg",
+    syllables: "ci-gogne",
   },
   {
     text: "montagne",
     image: "/images/montagne.jpg",
+    syllables: "mon-ta-gne",
   },
   {
     text: "agneau",
     image: "/images/agneau.jpg",
+    syllables: "a-gneau",
   },
 ];
 
@@ -30,50 +35,58 @@ export default function GNPage() {
   const [audioURL, setAudioURL] = useState("");
   const [score, setScore] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
+  const [level, setLevel] = useState("");
 
   const chunksRef = useRef<Blob[]>([]);
   const current = words[index];
 
-  // 🔊 model pronunciation
+  // 🔊 model
   const playModel = () => {
     const utterance = new SpeechSynthesisUtterance(current.text);
     utterance.lang = "fr-FR";
     speechSynthesis.speak(utterance);
   };
 
-  // 🧠 phonetic scoring (NO API)
-  const getSimilarityScore = (spoken: string, target: string) => {
+  // 🧠 improved phonetic logic
+  const analyzePronunciation = (spoken: string, target: string) => {
     const s = spoken.toLowerCase();
 
-    // 🟢 perfect match
+    let score = 20;
+    let issues: string[] = [];
+
+    // 🟢 full match
     if (s.includes(target.toLowerCase())) {
-      return 95;
+      score = 95;
     }
 
-    // 🟡 French nasal /ɲ/ patterns (important for your phoneme set)
-    const gnSound =
-      s.includes("gn") ||
-      s.includes("ni") ||
-      s.includes("ny") ||
-      s.includes("gne");
+    // 🟡 nasal / gn detection (important for French)
+    const hasGN =
+      s.includes("gn") || s.includes("ni") || s.includes("ny");
 
-    if (gnSound) return 85;
+    if (hasGN) {
+      score += 20;
+    } else {
+      issues.push("Son /ɲ/ (gn) manquant");
+    }
 
-    // 🟠 partial similarity (letters overlap)
-    const overlap = target
-      .toLowerCase()
-      .split("")
-      .filter((c) => s.includes(c)).length;
+    // 🟡 syllable awareness
+    const syllables = current.syllables.split("-");
+    const syllableMatch = syllables.filter((syll) =>
+      s.includes(syll.replace(/-/g, ""))
+    ).length;
 
-    const ratio = overlap / target.length;
+    score += syllableMatch * 10;
 
-    if (ratio > 0.7) return 75;
-    if (ratio > 0.4) return 60;
+    if (syllableMatch < syllables.length / 2) {
+      issues.push("Structure syllabique incorrecte");
+    }
 
-    // 🔴 weak speech
-    if (s.length > 2) return 45;
+    // 🟡 length heuristic
+    if (s.length > 3) score += 10;
 
-    return 20;
+    if (score > 100) score = 100;
+
+    return { score, issues };
   };
 
   // 🎤 recording
@@ -109,31 +122,34 @@ export default function GNPage() {
 
         const spoken = (data.text || "").toLowerCase().trim();
 
-        // 🧠 SCORE
-        let scoreValue = getSimilarityScore(spoken, current.text);
+        const result = analyzePronunciation(
+          spoken,
+          current.text
+        );
 
-        // 🎧 small bonus for real speech
-        if (chunksRef.current.length > 10) {
-          scoreValue += 5;
+        setScore(result.score);
+
+        // 🎯 level system
+        if (result.score >= 85) {
+          setLevel("🟢 Excellent");
+        } else if (result.score >= 70) {
+          setLevel("🟡 Bon");
+        } else if (result.score >= 50) {
+          setLevel("🟠 Moyen");
+        } else {
+          setLevel("🔴 À améliorer");
         }
-
-        if (scoreValue > 100) scoreValue = 100;
-
-        setScore(scoreValue);
 
         // 💬 feedback
-        if (scoreValue >= 90) {
-          setFeedback("🟢 Très bonne prononciation");
-        } else if (scoreValue >= 75) {
-          setFeedback("🟡 Bonne prononciation");
-        } else if (scoreValue >= 55) {
-          setFeedback("🟠 Prononciation acceptable");
-        } else {
-          setFeedback("🔴 Essayez encore");
-        }
+        setFeedback(
+          result.issues.length > 0
+            ? result.issues.join(" | ")
+            : "Prononciation correcte 🎉"
+        );
       } catch (err) {
         setScore(0);
-        setFeedback("❌ Erreur transcription AI");
+        setFeedback("Erreur transcription");
+        setLevel("🔴 Error");
       }
 
       stream.getTracks().forEach((t) => t.stop());
@@ -146,25 +162,26 @@ export default function GNPage() {
     }, 3000);
   };
 
-  // ⏭ next word
   const nextWord = () => {
     setIndex((prev) => (prev + 1) % words.length);
     setAudioURL("");
     setScore(null);
     setFeedback("");
+    setLevel("");
   };
 
   return (
     <main style={{ padding: 40 }}>
-      <h1>🇫🇷 AI Pronunciation Trainer</h1>
+      <h1>🇫🇷 AI Phonetics Trainer — Phase 2</h1>
 
       <h2>{current.text}</h2>
+
+      <p>📚 Syllabes: {current.syllables}</p>
 
       <img
         src={current.image}
         width={250}
         style={{ marginTop: 10, borderRadius: 10 }}
-        alt={current.text}
       />
 
       <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
@@ -179,11 +196,12 @@ export default function GNPage() {
             marginTop: 20,
             padding: 15,
             borderRadius: 10,
-            backgroundColor: score >= 75 ? "#d1fae5" : "#fee2e2",
-            maxWidth: 350,
+            backgroundColor: score >= 70 ? "#d1fae5" : "#fee2e2",
+            maxWidth: 400,
           }}
         >
           <h3>Score: {score}/100</h3>
+          <h4>{level}</h4>
           <p>{feedback}</p>
         </div>
       )}
