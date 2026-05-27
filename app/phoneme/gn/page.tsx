@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const words = [
   {
@@ -36,9 +36,21 @@ export default function GNPage() {
   const [score, setScore] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
   const [level, setLevel] = useState("");
+  const [progress, setProgress] = useState<Record<string, number>>({});
 
   const chunksRef = useRef<Blob[]>([]);
   const current = words[index];
+
+  // 🧠 load progress
+  useEffect(() => {
+    const saved = localStorage.getItem("progress");
+    if (saved) setProgress(JSON.parse(saved));
+  }, []);
+
+  const saveProgress = (newProgress: Record<string, number>) => {
+    setProgress(newProgress);
+    localStorage.setItem("progress", JSON.stringify(newProgress));
+  };
 
   // 🔊 model
   const playModel = () => {
@@ -47,46 +59,30 @@ export default function GNPage() {
     speechSynthesis.speak(utterance);
   };
 
-  // 🧠 improved phonetic logic
-  const analyzePronunciation = (spoken: string, target: string) => {
+  // 🧠 scoring engine
+  const analyze = (spoken: string) => {
     const s = spoken.toLowerCase();
-
     let score = 20;
-    let issues: string[] = [];
 
-    // 🟢 full match
-    if (s.includes(target.toLowerCase())) {
+    if (s.includes(current.text.toLowerCase())) {
       score = 95;
     }
 
-    // 🟡 nasal / gn detection (important for French)
-    const hasGN =
+    const gn =
       s.includes("gn") || s.includes("ni") || s.includes("ny");
 
-    if (hasGN) {
-      score += 20;
-    } else {
-      issues.push("Son /ɲ/ (gn) manquant");
-    }
+    if (gn) score += 20;
 
-    // 🟡 syllable awareness
     const syllables = current.syllables.split("-");
-    const syllableMatch = syllables.filter((syll) =>
-      s.includes(syll.replace(/-/g, ""))
+    const match = syllables.filter((sy) =>
+      s.includes(sy.replace("-", ""))
     ).length;
 
-    score += syllableMatch * 10;
-
-    if (syllableMatch < syllables.length / 2) {
-      issues.push("Structure syllabique incorrecte");
-    }
-
-    // 🟡 length heuristic
-    if (s.length > 3) score += 10;
+    score += match * 10;
 
     if (score > 100) score = 100;
 
-    return { score, issues };
+    return score;
   };
 
   // 🎤 recording
@@ -119,37 +115,42 @@ export default function GNPage() {
         });
 
         const data = await res.json();
-
         const spoken = (data.text || "").toLowerCase().trim();
 
-        const result = analyzePronunciation(
-          spoken,
-          current.text
-        );
+        const newScore = analyze(spoken);
 
-        setScore(result.score);
+        setScore(newScore);
 
-        // 🎯 level system
-        if (result.score >= 85) {
-          setLevel("🟢 Excellent");
-        } else if (result.score >= 70) {
-          setLevel("🟡 Bon");
-        } else if (result.score >= 50) {
-          setLevel("🟠 Moyen");
-        } else {
-          setLevel("🔴 À améliorer");
-        }
+        // 🎯 LEVEL
+        let lvl = "";
+        if (newScore >= 85) lvl = "🟢 Excellent";
+        else if (newScore >= 70) lvl = "🟡 Bon";
+        else if (newScore >= 50) lvl = "🟠 Moyen";
+        else lvl = "🔴 À améliorer";
+
+        setLevel(lvl);
 
         // 💬 feedback
         setFeedback(
-          result.issues.length > 0
-            ? result.issues.join(" | ")
-            : "Prononciation correcte 🎉"
+          newScore >= 70
+            ? "Bonne prononciation"
+            : "Continue à pratiquer"
         );
+
+        // 📊 SAVE PROGRESS
+        const updated = {
+          ...progress,
+          [current.text]:
+            Math.max(
+              progress[current.text] || 0,
+              newScore
+            ),
+        };
+
+        saveProgress(updated);
       } catch (err) {
         setScore(0);
         setFeedback("Erreur transcription");
-        setLevel("🔴 Error");
       }
 
       stream.getTracks().forEach((t) => t.stop());
@@ -172,19 +173,37 @@ export default function GNPage() {
 
   return (
     <main style={{ padding: 40 }}>
-      <h1>🇫🇷 AI Phonetics Trainer — Phase 2</h1>
+      <h1>🇫🇷 AI Phonetics Trainer — Phase 3</h1>
 
       <h2>{current.text}</h2>
 
       <p>📚 Syllabes: {current.syllables}</p>
 
+      <p>
+        🧠 Best score:{" "}
+        {progress[current.text] || 0}
+      </p>
+
       <img
         src={current.image}
         width={250}
-        style={{ marginTop: 10, borderRadius: 10 }}
+        style={{
+          marginTop: 10,
+          borderRadius: 10,
+          border:
+            (progress[current.text] || 0) >= 80
+              ? "3px solid green"
+              : "3px solid transparent",
+        }}
       />
 
-      <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          marginTop: 20,
+        }}
+      >
         <button onClick={playModel}>▶ Écouter</button>
         <button onClick={startRecording}>🎤 Enregistrer</button>
         <button onClick={nextWord}>➡ Suivant</button>
@@ -196,7 +215,8 @@ export default function GNPage() {
             marginTop: 20,
             padding: 15,
             borderRadius: 10,
-            backgroundColor: score >= 70 ? "#d1fae5" : "#fee2e2",
+            backgroundColor:
+              score >= 70 ? "#d1fae5" : "#fee2e2",
             maxWidth: 400,
           }}
         >
