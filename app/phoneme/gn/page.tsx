@@ -36,14 +36,14 @@ export default function GNPage() {
   const chunksRef = useRef<Blob[]>([]);
   const current = words[index];
 
-  // 🔊 écouter modèle
+  // 🔊 modèle audio
   const playModel = () => {
     const utterance = new SpeechSynthesisUtterance(current.text);
     utterance.lang = "fr-FR";
     speechSynthesis.speak(utterance);
   };
 
-  // 🎤 enregistrement
+  // 🎤 enregistrement stable
   const startRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
@@ -64,7 +64,7 @@ export default function GNPage() {
       setAudioURL(URL.createObjectURL(blob));
 
       try {
-        // 1️⃣ transcription (Whisper API)
+        // 1️⃣ transcription
         const formData = new FormData();
         formData.append("file", blob, "audio.webm");
 
@@ -74,9 +74,10 @@ export default function GNPage() {
         });
 
         const data = await res.json();
+
         const spoken = (data.text || "").toLowerCase().trim();
 
-        // 2️⃣ scoring API
+        // 2️⃣ scoring
         const res2 = await fetch("/api/score", {
           method: "POST",
           body: JSON.stringify({
@@ -94,7 +95,7 @@ export default function GNPage() {
         setScore(finalScore);
         setHistory((h) => [...h, finalScore]);
 
-        // 💬 feedback FR
+        // 🇫🇷 feedback FR
         if (finalScore >= 85) {
           setFeedback("🟢 Excellente prononciation (niveau natif)");
         } else if (finalScore >= 70) {
@@ -119,7 +120,7 @@ export default function GNPage() {
     }, 3000);
   };
 
-  // ➡️ mot suivant
+  // ➡️ mot suivant (reset کامل)
   const nextWord = () => {
     setIndex((p) => (p + 1) % words.length);
     setScore(null);
@@ -127,7 +128,7 @@ export default function GNPage() {
     setAudioURL("");
   };
 
-  // 📈 tendance
+  // 📊 trend
   const getTrend = () => {
     if (history.length < 2) return "stable";
 
@@ -155,6 +156,7 @@ export default function GNPage() {
         src={current.image}
         width={250}
         style={{ borderRadius: 10, marginTop: 10 }}
+        alt={current.text}
       />
 
       <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
@@ -169,8 +171,7 @@ export default function GNPage() {
             marginTop: 20,
             padding: 15,
             borderRadius: 10,
-            backgroundColor:
-              score >= 70 ? "#d1fae5" : "#fee2e2",
+            backgroundColor: score >= 70 ? "#d1fae5" : "#fee2e2",
             maxWidth: 400,
           }}
         >
