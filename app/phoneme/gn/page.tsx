@@ -7,42 +7,45 @@ const words = [
     text: "champignon",
     image: "/images/champignon.jpg",
     syllables: ["cham", "pi", "gnon"],
-    focus: "ɲ",
   },
   {
     text: "baignoire",
     image: "/images/baignoire.jpg",
     syllables: ["bai", "gnoi", "re"],
-    focus: "ɲ",
   },
   {
     text: "cigogne",
     image: "/images/cigogne.jpg",
     syllables: ["ci", "gogne"],
-    focus: "ɲ",
   },
   {
     text: "montagne",
     image: "/images/montagne.jpg",
     syllables: ["mon", "ta", "gne"],
-    focus: "ɲ",
   },
   {
     text: "agneau",
     image: "/images/agneau.jpg",
     syllables: ["a", "gneau"],
-    focus: "ɲ",
   },
 ];
 
-type Mastery = "weak" | "learning" | "mastered";
+// 🧠 pseudo phoneme scoring rules
+const phonemeRules = {
+  "ɲ": ["gn", "ni", "ny"],
+  "ʃ": ["ch", "sh"],
+  "ɑ̃": ["an", "en", "am", "em"],
+};
 
 export default function GNPage() {
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
-  const [analysis, setAnalysis] = useState<string[]>([]);
-  const [mastery, setMastery] = useState<Record<string, Mastery>>({});
+  const [audioURL, setAudioURL] = useState("");
+
+  const [streak, setStreak] = useState(0);
+  const [points, setPoints] = useState(0);
+  const [history, setHistory] = useState<number[]>([]);
 
   const chunksRef = useRef<Blob[]>([]);
   const current = words[index];
@@ -54,60 +57,65 @@ export default function GNPage() {
     speechSynthesis.speak(utterance);
   };
 
-  // 🧠 ANALYSIS ENGINE (PHASE 5)
+  // 🧠 phoneme detection (pseudo AI)
+  const detectPhonemes = (text: string) => {
+    const s = text.toLowerCase();
+
+    const detected: string[] = [];
+
+    Object.entries(phonemeRules).forEach(([phoneme, patterns]) => {
+      if (patterns.some((p) => s.includes(p))) {
+        detected.push(phoneme);
+      }
+    });
+
+    return detected;
+  };
+
+  // 🧠 scoring engine (Phase 6)
   const analyze = (spoken: string) => {
     const s = spoken.toLowerCase();
 
     let score = 30;
     const issues: string[] = [];
-    const syllableHits: Record<string, boolean> = {};
 
-    // 🟢 full match
+    // 🟢 exact match
     if (s.includes(current.text.toLowerCase())) {
       score = 95;
     }
 
-    // 🧠 /ɲ/ detection
-    const hasGN =
-      s.includes("gn") || s.includes("ni") || s.includes("ny");
+    // 🧠 phoneme detection
+    const detected = detectPhonemes(s);
 
-    if (hasGN) {
+    if (detected.includes("ɲ")) {
       score += 25;
     } else {
-      issues.push("Son /ɲ/ absent ou incorrect");
+      issues.push("Son /ɲ/ manquant");
     }
 
-    // 🧠 syllables
-    let correct = 0;
+    if (detected.includes("ʃ")) {
+      score += 10;
+    }
 
+    if (detected.includes("ɑ̃")) {
+      score += 10;
+    }
+
+    // 🧩 syllable bonus
+    let syllableHits = 0;
     current.syllables.forEach((syll) => {
-      const clean = syll.replace(/-/g, "");
-      const ok = s.includes(clean);
-
-      syllableHits[syll] = ok;
-
-      if (ok) correct++;
-      else issues.push(`Syllabe manquante: ${syll}`);
+      if (s.includes(syll.replace(/-/g, ""))) {
+        syllableHits++;
+      } else {
+        issues.push(`Syllabe faible: ${syll}`);
+      }
     });
 
-    score += correct * 10;
+    score += syllableHits * 8;
 
     if (score > 100) score = 100;
 
-    return { score, issues, syllableHits };
-  };
-
-  // 🧠 mastery system
-  const updateMastery = (word: string, score: number) => {
-    let level: Mastery = "weak";
-
-    if (score >= 85) level = "mastered";
-    else if (score >= 60) level = "learning";
-
-    setMastery((prev) => ({
-      ...prev,
-      [word]: level,
-    }));
+    return { score, issues };
   };
 
   // 🎤 recording
@@ -128,6 +136,8 @@ export default function GNPage() {
         type: "audio/webm",
       });
 
+      setAudioURL(URL.createObjectURL(blob));
+
       try {
         const formData = new FormData();
         formData.append("file", blob, "audio.webm");
@@ -143,23 +153,29 @@ export default function GNPage() {
         const result = analyze(spoken);
 
         setScore(result.score);
-        setAnalysis(result.issues);
+        setHistory((h) => [...h, result.score]);
 
-        updateMastery(current.text, result.score);
+        // 🔥 streak system
+        if (result.score >= 80) {
+          setStreak((s) => s + 1);
+          setPoints((p) => p + 10);
+        } else {
+          setStreak(0);
+        }
 
-        // 💬 AI-style feedback
+        // 💬 AI feedback
         if (result.score >= 85) {
-          setFeedback("🟢 Excellent pronunciation !");
+          setFeedback("🟢 Excellent pronunciation");
         } else if (result.score >= 70) {
-          setFeedback("🟡 Good, but refine nasal sound /ɲ/");
+          setFeedback("🟡 Good, refine nasal sounds");
         } else if (result.score >= 50) {
           setFeedback("🟠 Keep practicing syllables");
         } else {
-          setFeedback("🔴 Focus on pronunciation slow repetition");
+          setFeedback("🔴 Slow repetition needed");
         }
       } catch (err) {
         setScore(0);
-        setFeedback("Erreur transcription");
+        setFeedback("Error transcription");
       }
 
       stream.getTracks().forEach((t) => t.stop());
@@ -170,68 +186,52 @@ export default function GNPage() {
   };
 
   const nextWord = () => {
-    setIndex((prev) => (prev + 1) % words.length);
+    setIndex((i) => (i + 1) % words.length);
     setScore(null);
     setFeedback("");
-    setAnalysis([]);
+    setAudioURL("");
   };
 
-  // 🧠 AI hint system
-  const getHint = () => {
-    if (score === null) return "🎧 Écoutez d'abord le modèle";
-    if (score < 50) return "👉 Prononce lentement chaque syllabe";
-    if (score < 80) return "👉 Focus sur le son nasal /ɲ/";
-    return "✅ Très bon niveau, continuez";
-  };
+  // 📈 trend
+  const getTrend = () => {
+    if (history.length < 2) return "stable";
+    const last = history[history.length - 1];
+    const prev = history[history.length - 2];
 
-  const getColor = (syll: string, ok?: boolean) => {
-    if (ok === undefined) return "#eee";
-    return ok ? "#bbf7d0" : "#fecaca";
+    if (last > prev) return "📈 improving";
+    if (last < prev) return "📉 dropping";
+    return "➡ stable";
   };
 
   return (
     <main style={{ padding: 40 }}>
-      <h1>🇫🇷 AI Pronunciation Coach — Phase 5</h1>
+      <h1>🇫🇷 AI Speech Coach — Phase 6</h1>
 
-      {/* 📊 dashboard */}
+      {/* 🎮 gamification */}
       <div style={{ marginBottom: 15 }}>
-        <h3>📊 Progress Dashboard</h3>
-        <ul>
-          {words.map((w) => (
-            <li key={w.text}>
-              {w.text} →{" "}
-              {mastery[w.text] || "not tested"}
-            </li>
-          ))}
-        </ul>
+        <h3>🎮 Game Stats</h3>
+        <p>🔥 Streak: {streak}</p>
+        <p>⭐ Points: {points}</p>
+        <p>📊 Trend: {getTrend()}</p>
       </div>
 
       <h2>{current.text}</h2>
 
-      {/* 🧩 syllable heatmap */}
+      {/* 🧩 syllables */}
       <div style={{ display: "flex", gap: 5 }}>
-        {current.syllables.map((syll) => {
-          const ok =
-            analysis.length === 0
-              ? undefined
-              : !analysis.some((a) =>
-                  a.includes(syll)
-                );
-
-          return (
-            <span
-              key={syll}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 6,
-                background: getColor(syll, ok),
-                fontWeight: 600,
-              }}
-            >
-              {syll}
-            </span>
-          );
-        })}
+        {current.syllables.map((syll) => (
+          <span
+            key={syll}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 6,
+              background: "#eee",
+              fontWeight: 600,
+            }}
+          >
+            {syll}
+          </span>
+        ))}
       </div>
 
       <img
@@ -246,11 +246,7 @@ export default function GNPage() {
         <button onClick={nextWord}>➡ Suivant</button>
       </div>
 
-      {/* 🧠 hint engine */}
-      <p style={{ marginTop: 10, fontStyle: "italic" }}>
-        {getHint()}
-      </p>
-
+      {/* 🧠 feedback */}
       {score !== null && (
         <div
           style={{
@@ -264,14 +260,13 @@ export default function GNPage() {
         >
           <h3>Score: {score}/100</h3>
           <p>{feedback}</p>
+        </div>
+      )}
 
-          {analysis.length > 0 && (
-            <ul>
-              {analysis.map((a, i) => (
-                <li key={i}>⚠️ {a}</li>
-              ))}
-            </ul>
-          )}
+      {/* 🎧 audio */}
+      {audioURL && (
+        <div style={{ marginTop: 20 }}>
+          <audio controls src={audioURL} />
         </div>
       )}
     </main>
